@@ -7,19 +7,30 @@
     <script>
       alert("WebView controlled");
 
-      // After 2 seconds, try to call the native JS bridge
+      // After 2 seconds, check which JS bridges are available
       setTimeout(function () {
-        try {
-          if (window.JS2NativeBridge && JS2NativeBridge._invokeMethod) {
-            JS2NativeBridge._invokeMethod(
-              '{"func":"core.getNativeData","params":{"key":"userInfo"},"__msg_type":"call","__callback_id":"9999"}'
-            );
-            alert("Called JS2NativeBridge._invokeMethod(userInfo)");
-          } else {
-            alert("JS2NativeBridge not available in this WebView");
-          }
-        } catch (e) {
-          alert("Bridge call error: " + e);
+        var msg = [];
+
+        if (window.JS2NativeBridge) {
+          msg.push("JS2NativeBridge");
+        }
+        if (window.BDXBridge) {
+          msg.push("BDXBridge");
+        }
+        if (window.ToutiaoJSBridge) {
+          msg.push("ToutiaoJSBridge");
+        }
+        if (window.__WebViewRequest) {
+          msg.push("__WebViewRequest");
+        }
+        if (window.__WebViewReport) {
+          msg.push("__WebViewReport");
+        }
+
+        if (msg.length === 0) {
+          alert("Available bridges: none");
+        } else {
+          alert("Available bridges: " + msg.join(", "));
         }
       }, 2000);
     </script>
