@@ -134,6 +134,20 @@
         }
       }
 
+
+      function dumpBridge(obj, name) {
+  try {
+    var keys = Object.keys(obj || {});
+    log("[PoC] Keys on " + name + ": " + keys.join(", "));
+  } catch (e) {
+    log("[PoC] dumpBridge error on " + name + ": " + e);
+  }
+}
+
+window.addEventListener("load", function () {
+  dumpBridge(window.ToutiaoJSBridge || {}, "ToutiaoJSBridge");
+  dumpBridge(window.Native2JSBridge || {}, "Native2JSBridge");
+});
       // Hook likely native->JS callback entrypoints
       // You may need to adapt these names after you see real traffic in Frida
       (function hookNativeCallbacks() {
